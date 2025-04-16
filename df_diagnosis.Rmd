@@ -1,0 +1,92 @@
+---
+title: "df_diagnosis"
+output: html_document
+date: "2025-04-06"
+---
+
+```{r}
+library(tidyverse)
+library(qs)
+
+large1 = qread("large_effect/400_0334.qs")
+small1 = qread("small_effect/400_0813.qs")
+obtained_pp = read_csv("obtained/primeprobe_processed.csv")
+obtained_f = read_csv("obtained/flanker_processed2.csv")
+```
+
+```{r}
+all_rt_plot = large1 %>% 
+  ggplot(aes(x=diffusion_rt)) +
+  geom_histogram()
+
+all_rt_plot
+```
+```{r}
+large1 = large1 %>% 
+  mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency)) 
+condition_plot = large1 %>% 
+  #filter(congruency == "incongruent") %>% 
+  ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
+  geom_density(alpha=.5)+
+  xlim(0,3)+
+  ylim(0,3.5)
+
+condition_plot
+
+large1 %>% count(congruency)
+
+hist(large1$diffusion_rt)
+```
+```{r}
+obtained_pp = obtained_pp %>% 
+   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency))
+
+obtained_plot = obtained_pp %>% 
+  #filter(congruency == "incongruent") %>% 
+  ggplot(aes(x=rt/1000, fill = condition, position = 'identity'))+
+  geom_density(alpha=.5)+
+  xlim(0,3)+
+  ylim(0,3.5)
+
+obtained_plot
+
+```
+```{r}
+small1 = small1 %>% 
+  mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency))
+
+obtained_f = obtained_f %>% 
+   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency))
+
+
+flanker_simplot = small1 %>% 
+ #filter(1>=diffusion_rt) %>% 
+  ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
+  geom_density(alpha=.5) +
+  xlim(0,3)+
+  ylim(0,2)
+
+flanker_simplot
+  
+```
+
+```{r}
+flanker_emplot = obtained_f %>% 
+  #filter(congruency == "incongruent") %>% 
+  ggplot(aes(x=rt/1000, fill = condition, position = 'identity'))+
+  geom_density(alpha=.5)+
+  xlim(0,3)+
+  ylim(0,2)
+
+flanker_emplot
+```
+
+

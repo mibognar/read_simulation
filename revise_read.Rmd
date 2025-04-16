@@ -1,0 +1,279 @@
+---
+title: "Read new simulation results data"
+output: html_document
+date: "2025-04-03"
+---
+
+### Read datafile
+```{r}
+library(tidyverse)
+combined_results = read_csv("newrun/combined_results.csv")
+```
+
+
+
+### Large effect read
+```{r}
+large_effects = combined_results %>% 
+  filter(effect_size == "large_effect")
+```
+
+
+```{r}
+large_summary_table_models = large_effects %>% 
+  #filter(filter_type == "no_filter") %>% 
+  group_by(model_id, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+
+```
+
+```{r}
+large_summary_plot_models = large_summary_table_models %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+large_summary_plot_models
+```
+
+```{r}
+large_summary_table_filters = large_effects %>% 
+  group_by(filter_type, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+
+```
+
+```{r}
+large_summary_plot_filters = large_summary_table_filters %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = filter_type, color = filter_type)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+large_summary_plot_filters
+```
+
+
+
+```{r}
+large_summary_table_anova = large_effects %>% 
+  filter(model_id == 'anova') %>% 
+  group_by(filter_type, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+
+```{r}
+large_summary_plot_anova = large_summary_table_anova %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = filter_type, color = filter_type)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+large_summary_plot_anova
+```
+```{r}
+large_summary_table_full_lmer = large_effects %>% 
+  filter(model_id == 'anova') %>% 
+  group_by(filter_type, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+
+```{r}
+large_summary_plot_full_lmer = large_summary_table_full_lmer %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = filter_type, color = filter_type)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+large_summary_plot_full_lmer 
+```
+
+
+## small summary read
+```{r}
+small_effects = combined_results %>% 
+  filter(effect_size == "small_effect")
+```
+
+```{r}
+small_summary_table_models = small_effects %>% 
+  group_by(model_id, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+
+```{r}
+small_summary_plot_models = small_summary_table_models %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+small_summary_plot_models
+```
+```{r}
+small_summary_table_simple_lmer = small_effects %>% 
+  #filter(model_id == 'simple_lmer') %>% 
+  group_by(filter_type, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+
+```{r}
+small_summary_plot_simple_lmer = small_summary_table_simple_lmer %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = filter_type, color = filter_type)+
+  geom_point()+
+  geom_path()+
+  ylim(0,1)
+small_summary_plot_simple_lmer
+```
+```{r}
+small_summary_table_models = small_effects %>% 
+  filter(filter_type == 'no_filter') %>% 
+  group_by(model_id, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+```{r}
+small_summary_plot_models = small_summary_table_models %>% 
+  ggplot() +
+  aes(x=participants, y=TPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path()+
+  ylim(0,1)
+  
+
+small_summary_plot_models
+
+```
+```{r}
+large_summary_table_models = large_effects %>% 
+  #filter(model_id == 'simple_lmer') %>% 
+  group_by(model_id, participants) %>% 
+  summarize(TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+```
+
+```{r}
+large_summary_plot_models = large_summary_table_models %>% 
+  ggplot() +
+  aes(x
+      =participants, y=TPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+
+large_summary_plot_models
+
+```
+
+## NO summary read
+```{r}
+small_no_effects = combined_results %>% 
+  filter(effect_size == "small_no_effect")
+
+combined_results %>% count(effect_size)
+
+no_small_summary_table_models = small_no_effects %>%
+  filter(filter_type == "no_filter") %>% 
+  group_by(model_id, participants) %>% 
+  summarize(FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+
+no_small_summary_plot_models = no_small_summary_table_models %>% 
+  ggplot() +
+  aes(x=participants, y=FPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+
+no_small_summary_plot_models
+
+```
+```{r}
+large_no_effects = combined_results %>% 
+  filter(effect_size == "large_no_effect")
+
+no_large_summary_table_models = large_no_effects %>% 
+  filter(filter_type == "no_filter") %>%
+  group_by(model_id, participants) %>% 
+  summarize(FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+
+no_large_summary_plot_models = no_large_summary_table_models %>% 
+  ggplot() +
+  aes(x=participants, y=FPR, group = model_id, color = model_id)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+
+no_large_summary_plot_models
+```
+```{r}
+large_no_effects = combined_results %>% 
+  filter(effect_size == "large_no_effect")
+
+no_large_summary_table_filters = large_no_effects %>% 
+  filter(model_id == "full_glmer") %>% 
+  group_by(filter_type, participants) %>% 
+  summarize(FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T))
+
+no_large_summary_plot_filters = no_large_summary_table_filters %>% 
+  ggplot() +
+  aes(x=participants, y=FPR, group = filter_type, color = filter_type)+
+  geom_point()+
+  geom_path() +
+  ylim(0,1)
+
+no_large_summary_plot_filters
+```
+
+```{r}
+small_roc_data = small_summary_table %>% 
+  left_join(., no_summary_table, by="model_id")
+```
+
+## NO summary read
+```
+
+```{r}
+library(qs)
+sampledata1 =qread("sampled_files/sampled_files/large_effect/400_0659.qs")
+sampledata2 = qread("sampled_files/sampled_files/small_effect/200_0589.qs")
+```
+
+
+```{r}
+participants = sampledata1 %>% 
+  group_by(participant_id) %>% 
+  summarize(meanrt = mean(diffusion_rt, na.rm = T),
+            sdrt = sd(diffusion_rt))
+
+sd(sampledata1$diffusion_rt)
+
+csedata = sampledata1 %>% 
+  group_by(prev_congruent, is_congruent) %>% 
+  summarize(meanrt = mean(diffusion_rt, na.rm = T))
+
+csedata %>% ggplot() +
+  aes(x=prev_congruent, y = meanrt, group = is_congruent, color = is_congruent) +
+  geom_point()+
+  geom_path()
+```
+
+```{r}
+library(lme4)
+library(ez)
+mymodel = lmer(diffusion_rt ~ is_congruent + is_congruent:prev_congruent + (1 | participant_id), data = sampledata1)
+summary(mymodel)
+
+csedatasummary = sampledata1 %>% 
+  group_by(participant_id, prev_congruent, is_congruent) %>% 
+  summarize(meanrt = mean(diffusion_rt),
+            N = n())
+
+test = csedatasummary %>% group_by(participant_id) %>% summarize(condn = n())
+
+(II-IC)<(CI-CC)
+
+summary(aov(meanrt ~ as.factor(is_congruent) + as.factor(is_congruent)*as.factor(prev_congruent) + Error(1/participant_id), data = csedatasummary))
+
+myanova = ezANOVA(data = csedatasummary, dv = meanrt, wid = participant_id, within = .(is_congruent, prev_congruent))
+```
+
