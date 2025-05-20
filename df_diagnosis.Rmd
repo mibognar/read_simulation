@@ -29,16 +29,72 @@ large1 = large1 %>%
 condition_plot = large1 %>% 
   #filter(congruency == "incongruent") %>% 
   ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
-  geom_density(alpha=.5)+
+  geom_density(alpha=.7)+
   xlim(0,3)+
   ylim(0,3.5)
 
 condition_plot
-
-large1 %>% count(congruency)
-
-hist(large1$diffusion_rt)
 ```
+```{r}
+library(stats)
+filteredlarge = large1 %>%  
+  mutate(condition = paste0(prev_congruency,"-", congruency))
+
+filtered_large_summary = filteredlarge %>% 
+  group_by(participant_id, condition) %>% 
+  summarize(cond_mean_rt = mean(diffusion_rt, na.rm = T),
+            cond_median_rt = median(diffusion_rt, na.rm = T),
+            cond_sd_rt = sd(diffusion_rt, na.rm = T),
+            cond_mad_rt = mad(diffusion_rt, na.rm = T))
+
+large_filtered = filteredlarge %>% 
+  left_join(., filtered_large_summary, by=c("participant_id", "condition")) %>% 
+  mutate(cond_z = (diffusion_rt-cond_mean_rt)/cond_sd_rt,
+         cond_mad = (diffusion_rt-cond_median_rt)/cond_mad_rt)
+
+filtered_plot = large_filtered %>% 
+  filter(diffusion_rt < 1.25) %>% 
+  ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
+  geom_density(alpha=.7)+
+  xlim(0,3)+
+  ylim(0,3.5)+
+  theme_minimal()
+
+filtered_plot
+```
+```{r}
+summarytable = large_filtered %>% 
+  group_by(congruency, prev_congruency) %>% 
+  summarize(rt_mean = mean(diffusion_rt))
+
+summaryfiltered = large_filtered %>% 
+  filter(cond_mad < 2) %>% 
+  group_by(congruency, prev_congruency) %>% 
+  summarize(rt_mean = mean(diffusion_rt))
+
+```
+
+```{r}
+rawcse = summarytable %>% 
+  ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
+  geom_point() +
+  geom_path()
+
+rawcse
+
+```
+
+```{r}
+filtercse = summaryfiltered %>% 
+  ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
+  geom_point() +
+  geom_path()
+
+filtercse
+
+```
+
+
 ```{r}
 obtained_pp = obtained_pp %>% 
    mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
