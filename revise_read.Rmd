@@ -854,7 +854,7 @@ small_roc_data = small_summary_table %>%
 
 ```{r}
 library(qs)
-sampledata1 =qread("sampled_files/sampled_files/large_effect/400_0659.qs")
+sampledata1 =qread("results/0505/large_effect_sample.qs")
 sampledata2 = qread("sampled_files/sampled_files/small_effect/200_0589.qs")
 ```
 
@@ -867,6 +867,8 @@ participants = sampledata1 %>%
 
 sd(sampledata1$diffusion_rt)
 
+hist(sampledata1$diffusion_rt)
+
 csedata = sampledata1 %>% 
   group_by(prev_congruent, is_congruent) %>% 
   summarize(meanrt = mean(diffusion_rt, na.rm = T))
@@ -875,6 +877,11 @@ csedata %>% ggplot() +
   aes(x=prev_congruent, y = meanrt, group = is_congruent, color = is_congruent) +
   geom_point()+
   geom_path()
+```
+```{r}
+primprob = read_csv("obtained/primeprobe_processed.csv")
+
+hist(primprob$rt)
 ```
 
 ```{r}
