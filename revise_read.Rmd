@@ -8,9 +8,31 @@ date: "2025-04-03"
 ```{r}
 library(tidyverse)
 library(papaja)
+library(viridis)
 combined_results = read_csv("0505/combined_results_contaminants.csv")
+cse_descriptives = read_csv("0505/all_cse_results.csv")
+
+combined_results = combined_results %>% 
+  left_join(., cse_descriptives, by=c("effect_size", "job_id", "participants", "filter_type", "df_id"))
+
+
+cb_palette <- c(
+  "#332288", # dark blue
+  "#88CCEE", # light blue
+  "#117733", # green
+  "#DDCC77", # sand
+  "#CC6677", # red
+  "#AA4499", # purple
+  "#44AA99"  # turquoise
+)
 ```
 
+```{r}
+combined_results = combined_results %>% 
+  mutate(evidence_for_cse = ifelse(model_id == 'anova', ifelse(p.value<.05 & cse>0, 1, 0), ifelse(evidence,1,0)),
+         #evidence_with_sesoi = ifelse(model_id == 'anova', ifelse(p.value<.05 & cse>0, 1, 0), ifelse(evidence==T & estimate< -10, 1,0))
+         )
+```
 
 
 
@@ -27,6 +49,22 @@ large_no_effects = combined_results %>%
 small_no_effects = combined_results %>% 
   filter(effect_size == "small_no_effect")
 ```
+
+#### Evicence test
+```{r}
+lmer_evidence_table = large_no_effects %>% #combined_results %>%
+  filter(model_id != "anova") %>% 
+  mutate(criteria_discrepancy = ifelse(p.value<.05 & evidence == FALSE & estimate<0, 1, 0))
+
+lmer_evidence_table %>% count(criteria_discrepancy)
+
+
+discrepancies = lmer_evidence_table %>% 
+  filter(criteria_discrepancy == 1)
+  
+```
+
+
 
 # Large effect read
 ```{r}
@@ -60,50 +98,60 @@ convergence_large_no = large_no_effects %>%
 
 convergence_table = rbind(convergence_large, convergence_small, convergence_large_no, convergence_small_no)
 
-View(apa_table(convergence_table, caption = "A summary table of the cars dataset."))
 
 flextable::flextable(convergence_table)
 
 ```
 
+### Visual jitter for ggplots
 ```{r}
+offsets_participants <- c('anova' = -2, 'simple_lmer' = 2, 'full_lmer' = -2, 'simple_log_lmer' = 2,'full_log_lmer' = -2)
+offsets_tprs <- c('anova' = -.002, 'simple_lmer' = .002, 'full_lmer' = -.002, 'simple_log_lmer' = .002,'full_log_lmer' = -.002)
+```
+
+```{r}
+
 large_summary_table_models = large_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
-            )
+            ) %>% 
+   mutate(participant_jitter = participants + offsets_participants[model_id],
+          TPR_jitter = TPR + offsets_tprs[model_id])
+  
 ```
 ```{r}
 large_summary_model_results = large_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
-            )
+            ) 
 large_summary_model_results
 ```
 
 ```{r}
 large_summary_plot_models = large_summary_table_models %>% 
   ggplot() +
-  aes(x=participants, y=TPR, group = model_id, color = model_id)+
+  aes(x=participant_jitter, y=TPR_jitter, group = model_id, color = model_id)+
   geom_point()+
-  geom_path(alpha = .6) +
-  ylim(0,1)+
-  scale_color_discrete(name = "Model Type", 
+  geom_path() +
+  scale_color_manual(name = "Model Type", 
                        labels = c("anova" = "ANOVA",
                                   "full_lmer" = "complex LMM",
                                   "simple_lmer" = "simple LMM",
                                   "simple_log_lmer" = "simple LMM with log(RT)",
-                                  "full_log_lmer" = "complex LMM with log(RT)"))+
-  scale_x_continuous(breaks = c(25, 50, 100, 200, 400))+
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  scale_x_continuous(name = "Participants", breaks = c(25, 50, 100, 200, 400))+
+  scale_y_continuous(name = "TPR",limits = c(0,1.05), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 large_summary_plot_models
@@ -120,18 +168,23 @@ no_large_summary_table_models = large_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
-            )
+            ) %>% 
+   mutate(participant_jitter = participants + offsets_participants[model_id],
+          FPR_jitter = FPR + offsets_tprs[model_id])
+```
 
+
+```{r}
 no_large_summary_results = large_no_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -142,17 +195,18 @@ no_large_summary_results
 ```{r}
 no_large_summary_plot_models = no_large_summary_table_models %>% 
   ggplot() +
-  aes(x=participants, y=FPR, group = model_id, color = model_id)+
+  aes(x=participant_jitter, y=FPR_jitter, group = model_id, color = model_id)+
   geom_point()+
   geom_path() +
-  ylim(0,1)+
-  scale_color_discrete(name = "Model Type", 
+  scale_color_manual(name = "Model Type", 
                        labels = c("anova" = "ANOVA",
                                   "full_lmer" = "complex LMM",
                                   "simple_lmer" = "simple LMM",
                                   "simple_log_lmer" = "simple LMM with log(RT)",
-                                  "full_log_lmer" = "complex LMM with log(RT)"))+
-  scale_x_continuous(breaks = c(25, 50, 100, 200, 400))+
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  scale_x_continuous(name="Participants", breaks = c(25, 50, 100, 200, 400))+
+  scale_y_continuous(name = "FPR",limits = c(0,1.05), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 no_large_summary_plot_models
@@ -166,11 +220,13 @@ large_summary_table_models_nofilter = large_effects %>%
          filter_type == "no_filter") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
-            )
+            ) %>% 
+   mutate(participant_jitter = participants + offsets_participants[model_id],
+          TPR_jitter = TPR + offsets_tprs[model_id])
 ```
 ```{r}
 large_summary_models_nofilter_results = large_effects %>% 
@@ -178,8 +234,8 @@ large_summary_models_nofilter_results = large_effects %>%
          filter_type == "no_filter") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -189,17 +245,18 @@ large_summary_models_nofilter_results
 ```{r}
 large_summary_plot_models_nofilter = large_summary_table_models_nofilter %>% 
   ggplot() +
-  aes(x=participants, y=TPR, group = model_id, color = model_id)+
+  aes(x=participant_jitter, y=TPR_jitter, group = model_id, color = model_id)+
   geom_point()+
-  geom_path(alpha = .6) +
-  ylim(0,1)+
-  scale_color_discrete(name = "Model Type", 
+  geom_path() +
+  scale_color_manual(name = "Model Type", 
                        labels = c("anova" = "ANOVA",
                                   "full_lmer" = "complex LMM",
                                   "simple_lmer" = "simple LMM",
                                   "simple_log_lmer" = "simple LMM with log(RT)",
-                                  "full_log_lmer" = "complex LMM with log(RT)"))+
-  scale_x_continuous(breaks = c(25, 50, 100, 200, 400))+
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  scale_x_continuous(name = "Participants", breaks = c(25, 50, 100, 200, 400))+
+  scale_y_continuous(name = "TPR",limits = c(0,1.05), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 large_summary_plot_models_nofilter
@@ -214,20 +271,22 @@ no_large_summary_table_models_nofilter = large_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova",
          filter_type == "no_filter") %>% 
   group_by(model_id, participants) %>% 
-  summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+   summarize(N = n(),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
-            )
+            ) %>% 
+   mutate(participant_jitter = participants + offsets_participants[model_id],
+          FPR_jitter = FPR + offsets_tprs[model_id])
 
 no_large_summary_results_nofilter = large_no_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova",
          filter_type == "no_filter") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -238,17 +297,18 @@ no_large_summary_results_nofilter
 ```{r}
 no_large_summary_plot_models_nofilter = no_large_summary_table_models_nofilter %>% 
   ggplot() +
-  aes(x=participants, y=FPR, group = model_id, color = model_id)+
+  aes(x=participant_jitter, y=FPR_jitter, group = model_id, color = model_id)+
   geom_point()+
   geom_path() +
-  ylim(0,1)+
-  scale_color_discrete(name = "Model Type", 
+  scale_color_manual(name = "Model Type", 
                        labels = c("anova" = "ANOVA",
                                   "full_lmer" = "complex LMM",
                                   "simple_lmer" = "simple LMM",
                                   "simple_log_lmer" = "simple LMM with log(RT)",
-                                  "full_log_lmer" = "complex LMM with log(RT)"))+
-  scale_x_continuous(breaks = c(25, 50, 100, 200, 400))+
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  scale_x_continuous(name="Participants", breaks = c(25, 50, 100, 200, 400))+
+  scale_y_continuous(name = "FPR",limits = c(0,1.05), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 no_large_summary_plot_models_nofilter
@@ -262,8 +322,8 @@ large_summary_table_models_3 = large_effects %>%
          filter_type == "sd_3.0") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -274,8 +334,8 @@ large_summary_models_3_results = large_effects %>%
          filter_type == "sd_3.0") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -311,8 +371,8 @@ no_large_summary_table_models_3 = large_no_effects %>%
          filter_type == "sd_3.0") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -322,8 +382,8 @@ no_large_summary_results_3 = large_no_effects %>%
          filter_type == "sd_3.0") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -359,8 +419,8 @@ large_summary_table_filters = large_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -371,8 +431,8 @@ large_summary_table_filters_results = large_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -404,8 +464,8 @@ no_large_summary_table_filters = large_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -416,8 +476,8 @@ no_large_summary_table_filters_results = large_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -429,14 +489,30 @@ large_summary_results = large_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id, filter_type) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
 
 large_summary_results
 ```
+### All combinations no effect
+```{r}
+large_summary_no_results = large_no_effects %>% 
+  filter(convergence_status == "Converged" | model_id == "anova") %>% 
+  group_by(model_id, filter_type) %>% 
+  summarize(N = n(),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
+            lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
+            upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
+            )
+
+large_summary_no_results
+```
+
+
 ```{r}
 no_large_summary_table_results = large_no_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
@@ -455,11 +531,11 @@ no_large_summary_table_results
 
 ```{r}
 small_summary_table_models = small_effects %>% 
-   filter(convergence_status == "Converged" | model_id == "anova") %>% 
+  filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -468,8 +544,8 @@ small_summary_table_models_results = small_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_with_sesoi, na.rm = T),
+            evidence_sd = sd(evidence_with_sesoi, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -501,8 +577,8 @@ small_no_summary_table_models = small_no_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -511,8 +587,8 @@ small_no_summary_table_models_results = small_no_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_with_sesoi, na.rm = T),
+            evidence_sd = sd(evidence_with_sesoi, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )

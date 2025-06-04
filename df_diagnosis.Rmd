@@ -7,11 +7,16 @@ date: "2025-04-06"
 ```{r}
 library(tidyverse)
 library(qs)
+library(lme4)
+library(lmerTest)
 
 large1 = qread("large_effect/400_0334.qs")
 small1 = qread("small_effect/400_0813.qs")
-obtained_pp = read_csv("obtained/primeprobe_processed.csv")
+obtained_pp = read_csv("obtained/pprocessed.csv")
 obtained_f = read_csv("obtained/flanker_processed2.csv")
+
+large_no_sample = qread("0505/nocontaminants_sample_datasets/large_no_effect.qs")
+small_no_sample = qread("0505/contaminants_sample_datasets/small_no_effect.qs")
 ```
 
 ```{r}
@@ -22,7 +27,7 @@ all_rt_plot = large1 %>%
 all_rt_plot
 ```
 ```{r}
-large1 = large1 %>% 
+large1 = large_no_sample %>% 
   mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
          prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
          condition = paste0(congruency, "-", prev_congruency)) 
@@ -64,8 +69,10 @@ filtered_plot
 ```
 ```{r}
 summarytable = large_filtered %>% 
+  mutate(correct = ifelse(diffusion_response == "upper", 1, 0)) %>% 
   group_by(congruency, prev_congruency) %>% 
-  summarize(rt_mean = mean(diffusion_rt))
+  summarize(rt_mean = mean(diffusion_rt),
+            accuracy = mean(correct))
 
 summaryfiltered = large_filtered %>% 
   filter(cond_mad < 2) %>% 
@@ -76,7 +83,7 @@ summaryfiltered = large_filtered %>%
 
 ```{r}
 rawcse = summarytable %>% 
-  ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
+  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
   geom_point() +
   geom_path()
 
@@ -85,7 +92,7 @@ rawcse
 ```
 
 ```{r}
-filtercse = summaryfiltered %>% 
+filtercse = summarytable %>% 
   ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
   geom_point() +
   geom_path()
@@ -97,9 +104,20 @@ filtercse
 
 ```{r}
 obtained_pp = obtained_pp %>% 
-   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
-         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
+   mutate(congruency = ifelse(is_congruent == 0, "I", "C"),
+         prev_congruency = ifelse(prev_congruent == 0, "i", "c"),
          condition = paste0(congruency, "-", prev_congruency))
+
+obtained_summary = obtained_pp %>% 
+  group_by(participant_id,congruency, prev_congruency) %>% 
+  summarize(mean_rt = mean(rt, na.rm=T)) %>% 
+  pivot_wider(values_from = mean_rt, names_from = c("prev_congruency", "congruency"),names_sep = "") %>% 
+  mutate(CSE = (cI-cC)-(iI-iC))
+
+filtercse = obtained_summary %>% 
+  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
+  geom_point() +
+  geom_path()
 
 obtained_plot = obtained_pp %>% 
   #filter(congruency == "incongruent") %>% 
@@ -109,8 +127,42 @@ obtained_plot = obtained_pp %>%
   ylim(0,3.5)
 
 obtained_plot
+filtercse
 
 ```
+```{r}
+obtained_f = obtained_f %>% 
+   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency))
+
+obtained_f_summary = obtained_f %>% 
+  group_by(congruency, prev_congruency) %>% 
+  summarize(accuracy = mean(correct, na.rm=T))
+
+filtercse_f = obtained_f_summary %>% 
+  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
+  geom_point() +
+  geom_path()
+filtercse_f
+```
+
+```{r}
+large_no_sample = large_no_sample %>% 
+  mutate(correct = ifelse(diffusion_response == "upper", 1,0))
+mymodel = glmer(correct ~ prev_congruent*is_congruent + (1+ is_congruent| participant_id), data=large_no_sample, family=binomial)
+summary(mymodel)
+
+nomistake = obtained_pp %>% 
+  filter(correct == 1)
+
+obtained_pp = obtained_pp %>% 
+  mutate(is_congruent = ifelse(is_congruent == 1, .5, -.5),
+         prev_congruent = ifelse(prev_congruent == 1, 1, -1))
+mymodel_rt = lmer(rt ~ prev_congruent*is_congruent + (1+ is_congruent| participant_id), control = lmerControl(optimizer = "Nelder_Mead"), data=obtained_pp)
+summary(mymodel_rt)
+```
+
 ```{r}
 small1 = small1 %>% 
   mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
