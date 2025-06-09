@@ -197,4 +197,16 @@ flanker_emplot = obtained_f %>%
 flanker_emplot
 ```
 
+```{r}
+large_no_datasets = large_no_effects %>% 
+  filter(model_id == "full_lmer",
+         participants == 400) %>% 
+  select(df_id,evidence_for_cse, filter_type) %>% 
+  group_by(df_id, filter_type) %>% 
+  pivot_wider(values_from = evidence_for_cse, names_from = filter_type)
+
+
+df4 = large_no_effects %>% 
+  filter(id == "400_0004")
+```
 

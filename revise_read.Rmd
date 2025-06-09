@@ -9,8 +9,8 @@ date: "2025-04-03"
 library(tidyverse)
 library(papaja)
 library(viridis)
-combined_results = read_csv("0505/combined_results_contaminants.csv")
-cse_descriptives = read_csv("0505/all_cse_results.csv")
+combined_results = read_csv("results/0505/combined_results_contaminants.csv")
+cse_descriptives = read_csv("results/0505/all_cse_results.csv")
 
 combined_results = combined_results %>% 
   left_join(., cse_descriptives, by=c("effect_size", "job_id", "participants", "filter_type", "df_id"))
@@ -20,17 +20,20 @@ cb_palette <- c(
   "#332288", # dark blue
   "#88CCEE", # light blue
   "#117733", # green
-  "#DDCC77", # sand
+  "#DDCC27", # sand
   "#CC6677", # red
   "#AA4499", # purple
-  "#44AA99"  # turquoise
+  "#44AA99",  # turquoise
+  "#B62355", # dark magenta
+  "#999933", # olive
+  "#661100" # dark brown
 )
 ```
 
 ```{r}
 combined_results = combined_results %>% 
   mutate(evidence_for_cse = ifelse(model_id == 'anova', ifelse(p.value<.05 & cse>0, 1, 0), ifelse(evidence,1,0)),
-         #evidence_with_sesoi = ifelse(model_id == 'anova', ifelse(p.value<.05 & cse>0, 1, 0), ifelse(evidence==T & estimate< -10, 1,0))
+         evidence_with_sesoi = ifelse(model_id == 'anova', ifelse(p.value<.05 & cse>0, 1, 0), ifelse(evidence==T & estimate< -1, 1,0))
          )
 ```
 
@@ -50,7 +53,7 @@ small_no_effects = combined_results %>%
   filter(effect_size == "small_no_effect")
 ```
 
-#### Evicence test
+#### Evidence test
 ```{r}
 lmer_evidence_table = large_no_effects %>% #combined_results %>%
   filter(model_id != "anova") %>% 
@@ -105,8 +108,9 @@ flextable::flextable(convergence_table)
 
 ### Visual jitter for ggplots
 ```{r}
-offsets_participants <- c('anova' = -2, 'simple_lmer' = 2, 'full_lmer' = -2, 'simple_log_lmer' = 2,'full_log_lmer' = -2)
+offsets_participants <- c('anova' = -1, 'simple_lmer' = 1, 'full_lmer' = -1, 'simple_log_lmer' = 1,'full_log_lmer' = -1)
 offsets_tprs <- c('anova' = -.002, 'simple_lmer' = .002, 'full_lmer' = -.002, 'simple_log_lmer' = .002,'full_log_lmer' = -.002)
+offsets_participants
 ```
 
 ```{r}
@@ -175,12 +179,14 @@ no_large_summary_table_models = large_no_effects %>%
             ) %>% 
    mutate(participant_jitter = participants + offsets_participants[model_id],
           FPR_jitter = FPR + offsets_tprs[model_id])
+
 ```
 
 
 ```{r}
 no_large_summary_results = large_no_effects %>% 
-  filter(convergence_status == "Converged" | model_id == "anova") %>% 
+  filter(convergence_status == "Converged" | model_id == "anova",
+         filter_type == "mad_2.0") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
             FPR = mean(evidence_for_cse, na.rm = T),
@@ -191,6 +197,19 @@ no_large_summary_results = large_no_effects %>%
 no_large_summary_results
 ```
 
+```{r}
+no_large_summary_sesoi = large_no_effects %>% 
+  filter(convergence_status == "Converged" | model_id == "anova",
+         filter_type == "mad_2.0") %>% 
+  group_by(model_id) %>% 
+  summarize(N = n(),
+            FPR = mean(evidence_with_sesoi, na.rm = T),
+            evidence_sd = sd(evidence_with_sesoi, na.rm = T),
+            lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
+            upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
+            )
+no_large_summary_sesoi
+```
 
 ```{r}
 no_large_summary_plot_models = no_large_summary_table_models %>% 
@@ -211,6 +230,40 @@ no_large_summary_plot_models = no_large_summary_table_models %>%
 
 no_large_summary_plot_models
 ggsave("no_all_models.png", dpi = 600, width = 8, height = 4)
+```
+
+### Combined plot
+
+```{r}
+combined_roc_plot_large = no_large_summary_table_models %>% 
+  select(FPR,FPR_jitter, model_id, participants) %>% 
+  left_join(., large_summary_table_models, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_large = combined_roc_plot_large[order(combined_roc_plot_large$model_id, combined_roc_plot_large$participants), ]
+
+
+combined_roc_plot_large %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color=NA) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_all_models.png", dpi = 600, width = 8, height = 4)
 ```
 
 ## NO FILTER MODELS
@@ -315,6 +368,39 @@ no_large_summary_plot_models_nofilter
 ggsave("no_all_models_nofilter.png", dpi = 600, width = 8, height = 4)
 ```
 
+### Nofilter ROC
+```{r}
+combined_roc_plot_large_nofilter = no_large_summary_table_models_nofilter %>% 
+  select(FPR,FPR_jitter, model_id, participants) %>% 
+  left_join(., large_summary_table_models_nofilter, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_large_nofilter = combined_roc_plot_large_nofilter[order(combined_roc_plot_large_nofilter$model_id, combined_roc_plot_large_nofilter$participants), ]
+
+
+combined_roc_plot_large_nofilter %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_nofilter_large.png", dpi = 600, width = 8, height = 4)
+```
+
 ### 3.0SD FILTER MODELS
 ```{r}
 large_summary_table_models_3 = large_effects %>% 
@@ -411,6 +497,38 @@ no_large_summary_plot_models_3
 ggsave("no_all_models_3.png", dpi = 600, width = 8, height = 4)
 ```
 
+### 3SD ROC
+```{r}
+combined_roc_plot_large_3 = no_large_summary_table_models_3 %>% 
+  select(FPR, model_id, participants) %>% 
+  left_join(., large_summary_table_models_3, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_large_3 = combined_roc_plot_large_3[order(combined_roc_plot_large_3$model_id, combined_roc_plot_large_3$participants), ]
+
+
+combined_roc_plot_large_3 %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_3SD_large.png", dpi = 600, width = 8, height = 4)
+```
 
 # OUTLIER FILTERS
 
@@ -483,6 +601,46 @@ no_large_summary_table_filters_results = large_no_effects %>%
             )
 no_large_summary_table_filters_results
 ```
+### Large Filters ROC
+```{r}
+combined_roc_plot_filters = no_large_summary_table_filters %>% 
+  select(FPR, filter_type, participants) %>% 
+  left_join(., large_summary_table_filters, by=c("participants", "filter_type")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[filter_type])
+
+combined_roc_plot_filters = combined_roc_plot_filters[order(combined_roc_plot_filters$filter_type, combined_roc_plot_filters$participants), ]
+
+
+combined_roc_plot_filters %>% ggplot(aes(x = FPR, y = TPR, group = filter_type, color = filter_type)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Filter Type", 
+                       labels = c("no_filter" = "No outlier filter",
+                                  "mad_2.0" = "+-2 MAD",
+                                  "mad_2.5" = "+-2.5 MAD",
+                                  "mad_3.0" = "+-3 MAD",
+                                  "sd_2.0" = "+-2 SD",
+                                  "sd_2.5" = "+-2.5 SD",
+                                  "sd_3.0" = "+-3 SD",
+                                  "time_1" = "200 ms < RT < 1000 ms",
+                                  "time_1.25" = "200 ms < RT < 1250 ms",
+                                  "time_1.5" = "200 ms < RT < 1500 ms"
+                                  ),
+                       values=cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.2), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_filters_large.png", dpi = 600, width = 8, height = 4)
+```
+
+
 ### All combinations
 ```{r}
 large_summary_results = large_effects %>% 
@@ -544,8 +702,8 @@ small_summary_table_models_results = small_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(evidence_with_sesoi, na.rm = T),
-            evidence_sd = sd(evidence_with_sesoi, na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -587,8 +745,8 @@ small_no_summary_table_models_results = small_no_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(evidence_with_sesoi, na.rm = T),
-            evidence_sd = sd(evidence_with_sesoi, na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -614,6 +772,38 @@ no_small_summary_models_plot
 ggsave(plot=no_small_summary_models_plot,"no_small_models.png", dpi = 600, width = 8, height = 4)
 ```
 
+### ROC SMALL aLL
+```{r}
+combined_roc_plot_small = small_no_summary_table_models %>% 
+  select(FPR, model_id, participants) %>% 
+  left_join(., small_summary_table_models, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_small = combined_roc_plot_small[order(combined_roc_plot_small$model_id, combined_roc_plot_small$participants), ]
+
+
+combined_roc_plot_small %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_all_small.png", dpi = 600, width = 8, height = 6)
+```
 
 ## NOFILTER SMALL
 ```{r}
@@ -622,8 +812,8 @@ small_summary_table_models_nofilter = small_effects %>%
   filter(filter_type == "no_filter") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -633,8 +823,8 @@ small_summary_table_models_results_nofilter = small_effects %>%
   filter(filter_type == "no_filter") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -669,8 +859,8 @@ no_small_summary_table_models_nofilter = small_no_effects %>%
   filter(filter_type == "no_filter") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -680,8 +870,8 @@ no_small_summary_table_models_results_nofilter = small_no_effects %>%
   filter(filter_type == "no_filter") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -708,6 +898,41 @@ no_small_summary_models_plot_nofilter
 ggsave(plot=no_small_summary_models_plot_nofilter,"no_small_models_nofilter.png", dpi = 600, width = 8, height = 4)
 
 ```
+
+### ROC SMALL NOFILTER
+```{r}
+combined_roc_plot_small_nofilter = no_small_summary_table_models_nofilter %>% 
+  select(FPR, model_id, participants) %>% 
+  left_join(., small_summary_table_models_nofilter, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_small_nofilter = combined_roc_plot_small_nofilter[order(combined_roc_plot_small_nofilter$model_id, combined_roc_plot_small_nofilter$participants), ]
+
+
+combined_roc_plot_small_nofilter %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_nofilter_small.png", dpi = 600, width = 8, height = 6)
+```
+
+
 ## 3.0SD SMALL
 ```{r}
 small_summary_table_models_3 = small_effects %>% 
@@ -715,8 +940,8 @@ small_summary_table_models_3 = small_effects %>%
   filter(filter_type == "sd_3.0") %>% 
   group_by(model_id, participants) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -726,8 +951,8 @@ small_summary_table_models_results_3 = small_effects %>%
   filter(filter_type == "sd_3.0") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -762,8 +987,8 @@ no_small_summary_table_models_3 = small_no_effects %>%
   filter(filter_type == "sd_3.0") %>% 
   group_by(model_id, participants) %>% 
    summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -773,8 +998,8 @@ no_small_summary_table_models_results_3 = small_no_effects %>%
   filter(filter_type == "sd_3.0") %>% 
   group_by(model_id) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -802,10 +1027,42 @@ ggsave(plot=no_small_summary_models_plot_3,"no_small_models_3.png", dpi = 600, w
 
 ```
 
-#### OUTLIER FILTERS
+### ROC SMALL 3SD
+```{r}
+combined_roc_plot_small_3SD = no_small_summary_table_models_3 %>% 
+  select(FPR, model_id, participants) %>% 
+  left_join(., small_summary_table_models_3, by=c("participants", "model_id")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[model_id])
+
+combined_roc_plot_small_3SD = combined_roc_plot_small_3SD[order(combined_roc_plot_small_3SD$model_id, combined_roc_plot_small_3SD$participants), ]
+
+
+combined_roc_plot_small_3SD %>% ggplot(aes(y = FPR, x = TPR, group = model_id, color = model_id)) +
+  geom_hline(yintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Model Type", 
+                       labels = c("anova" = "ANOVA",
+                                  "full_lmer" = "complex LMM",
+                                  "simple_lmer" = "simple LMM",
+                                  "simple_log_lmer" = "simple LMM with log(RT)",
+                                  "full_log_lmer" = "complex LMM with log(RT)"),
+                       values= cb_palette)+
+  labs(y = "False Positive Rate (FPR)",
+       x = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_y_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
+  scale_x_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+ggsave("ROC_3_small_horizontal.png", dpi = 600, width = 8, height = 6)
+```
 
 
 ```{r}
+#### OUTLIER FILTERS
+
 small_summary_table_filters = small_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type, participants) %>% 
@@ -817,6 +1074,7 @@ small_summary_table_filters = small_effects %>%
             )
 
 ```
+
 ```{r}
 small_summary_table_filters_results = small_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
