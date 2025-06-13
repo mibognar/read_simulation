@@ -9,14 +9,25 @@ library(tidyverse)
 library(qs)
 library(lme4)
 library(lmerTest)
+library(ez)
 
-large1 = qread("large_effect/400_0334.qs")
-small1 = qread("small_effect/400_0813.qs")
-obtained_pp = read_csv("obtained/pprocessed.csv")
-obtained_f = read_csv("obtained/flanker_processed2.csv")
 
-large_no_sample = qread("0505/nocontaminants_sample_datasets/large_no_effect.qs")
-small_no_sample = qread("0505/contaminants_sample_datasets/small_no_effect.qs")
+cb_palette <- c(
+  "#332288", # dark blue
+  "#88CCEE", # light blue
+  "#117733", # green
+  "#DDCC27", # sand
+  "#CC6677", # red
+  "#AA4499", # purple
+  "#44AA99",  # turquoise
+  "#B62355", # dark magenta
+  "#999933", # olive
+  "#661100" # dark brown
+)
+
+large1 = qread("results/0505/400_0004.qs")
+
+
 ```
 
 ```{r}
@@ -27,10 +38,18 @@ all_rt_plot = large1 %>%
 all_rt_plot
 ```
 ```{r}
-large1 = large_no_sample %>% 
+large1 = large1 %>% 
+mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
+         prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
+         condition = paste0(congruency, "-", prev_congruency))
+
+large1_prep = large1 %>% 
   mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
          prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
-         condition = paste0(congruency, "-", prev_congruency)) 
+         condition = paste0(congruency, "-", prev_congruency)) %>% 
+  filter(diffusion_response == "upper")
+
+
 condition_plot = large1 %>% 
   #filter(congruency == "incongruent") %>% 
   ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
@@ -42,7 +61,7 @@ condition_plot
 ```
 ```{r}
 library(stats)
-filteredlarge = large1 %>%  
+filteredlarge = large1_prep %>%  
   mutate(condition = paste0(prev_congruency,"-", congruency))
 
 filtered_large_summary = filteredlarge %>% 
@@ -55,44 +74,69 @@ filtered_large_summary = filteredlarge %>%
 large_filtered = filteredlarge %>% 
   left_join(., filtered_large_summary, by=c("participant_id", "condition")) %>% 
   mutate(cond_z = (diffusion_rt-cond_mean_rt)/cond_sd_rt,
-         cond_mad = (diffusion_rt-cond_median_rt)/cond_mad_rt)
+         cond_mad = (diffusion_rt-cond_median_rt)/cond_mad_rt) %>% 
+  filter(cond_mad<2)
 
 filtered_plot = large_filtered %>% 
-  filter(diffusion_rt < 1.25) %>% 
   ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
-  geom_density(alpha=.7)+
-  xlim(0,3)+
+  geom_density(alpha=.9)+
+  scale_x_continuous(name = "Reaction time (seconds)", limits = c(0,2))+
+  scale_fill_manual(values = cb_palette)+
   ylim(0,3.5)+
-  theme_minimal()
+  papaja::theme_apa()
 
 filtered_plot
 ```
 ```{r}
-summarytable = large_filtered %>% 
-  mutate(correct = ifelse(diffusion_response == "upper", 1, 0)) %>% 
+unfiltered_plot = large1 %>%
+  ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
+  geom_density(alpha=.7)+
+  scale_x_continuous(name = "Reaction time (seconds)", limits = c(0,2))+
+   scale_fill_manual(values = cb_palette)+
+  ylim(0,3.5)+
+  papaja::theme_apa()
+unfiltered_plot
+```
+```{r}
+summarytable_filtered = large_filtered %>% 
   group_by(congruency, prev_congruency) %>% 
-  summarize(rt_mean = mean(diffusion_rt),
-            accuracy = mean(correct))
+  summarize(rt_mean = mean(diffusion_rt)) %>% 
+  mutate(con = ifelse(congruency == "congruent", "C", "I"),
+         prevcon = ifelse(prev_congruency == "congruent", "c", "i"),
+         condition = paste0(prevcon,con)) %>% 
+  ungroup() %>% 
+  select(condition, rt_mean) %>% 
+  pivot_wider(names_from = condition, values_from = rt_mean) %>% 
+  mutate(CSE = (cI-cC)-(iI-iC))
+summarytable_filtered
+```
 
-summaryfiltered = large_filtered %>% 
-  filter(cond_mad < 2) %>% 
+
+```{r}
+summarytable_raw = large1 %>% 
   group_by(congruency, prev_congruency) %>% 
-  summarize(rt_mean = mean(diffusion_rt))
-
+  summarize(rt_mean = mean(diffusion_rt)) %>% 
+  mutate(con = ifelse(congruency == "congruent", "C", "I"),
+         prevcon = ifelse(prev_congruency == "congruent", "c", "i"),
+         condition = paste0(prevcon,con)) %>% 
+  ungroup() %>% 
+  select(condition, rt_mean) %>% 
+  pivot_wider(names_from = condition, values_from = rt_mean) %>% 
+  mutate(CSE = (cI-cC)-(iI-iC))
+summarytable_raw
 ```
 
 ```{r}
 rawcse = summarytable %>% 
-  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
+  ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
   geom_point() +
   geom_path()
 
 rawcse
 
 ```
-
 ```{r}
-filtercse = summarytable %>% 
+filtercse = summaryfiltered %>% 
   ggplot() + aes(y = rt_mean, x = prev_congruency, color = congruency, group = congruency) +
   geom_point() +
   geom_path()
@@ -101,112 +145,33 @@ filtercse
 
 ```
 
-
 ```{r}
-obtained_pp = obtained_pp %>% 
-   mutate(congruency = ifelse(is_congruent == 0, "I", "C"),
-         prev_congruency = ifelse(prev_congruent == 0, "i", "c"),
-         condition = paste0(congruency, "-", prev_congruency))
-
-obtained_summary = obtained_pp %>% 
-  group_by(participant_id,congruency, prev_congruency) %>% 
-  summarize(mean_rt = mean(rt, na.rm=T)) %>% 
-  pivot_wider(values_from = mean_rt, names_from = c("prev_congruency", "congruency"),names_sep = "") %>% 
-  mutate(CSE = (cI-cC)-(iI-iC))
-
-filtercse = obtained_summary %>% 
-  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
-  geom_point() +
-  geom_path()
-
-obtained_plot = obtained_pp %>% 
-  #filter(congruency == "incongruent") %>% 
-  ggplot(aes(x=rt/1000, fill = condition, position = 'identity'))+
-  geom_density(alpha=.5)+
-  xlim(0,3)+
-  ylim(0,3.5)
-
-obtained_plot
-filtercse
-
-```
-```{r}
-obtained_f = obtained_f %>% 
-   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
-         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
-         condition = paste0(congruency, "-", prev_congruency))
-
-obtained_f_summary = obtained_f %>% 
-  group_by(congruency, prev_congruency) %>% 
-  summarize(accuracy = mean(correct, na.rm=T))
-
-filtercse_f = obtained_f_summary %>% 
-  ggplot() + aes(y = accuracy, x = prev_congruency, color = congruency, group = congruency) +
-  geom_point() +
-  geom_path()
-filtercse_f
+raw_model = lmer(diffusion_rt ~ prev_congruent * is_congruent + (1+is_congruent|participant_id), data=large1, control = lmerControl(optimizer = "Nelder_Mead"))
+raw = summary(raw_model)
+raw["coefficients"]
 ```
 
 ```{r}
-large_no_sample = large_no_sample %>% 
-  mutate(correct = ifelse(diffusion_response == "upper", 1,0))
-mymodel = glmer(correct ~ prev_congruent*is_congruent + (1+ is_congruent| participant_id), data=large_no_sample, family=binomial)
-summary(mymodel)
+raw_aggregated = large1 %>% 
+  group_by(participant_id, congruency, prev_congruency) %>% 
+  summarize(mean_rt = mean(diffusion_rt, na.rm=T))
 
-nomistake = obtained_pp %>% 
-  filter(correct == 1)
-
-obtained_pp = obtained_pp %>% 
-  mutate(is_congruent = ifelse(is_congruent == 1, .5, -.5),
-         prev_congruent = ifelse(prev_congruent == 1, 1, -1))
-mymodel_rt = lmer(rt ~ prev_congruent*is_congruent + (1+ is_congruent| participant_id), control = lmerControl(optimizer = "Nelder_Mead"), data=obtained_pp)
-summary(mymodel_rt)
+raw_anova = ezANOVA(raw_aggregated, dv=mean_rt, wid = participant_id, within = .(prev_congruency, congruency))
+raw_anova
 ```
+
 
 ```{r}
-small1 = small1 %>% 
-  mutate(congruency = ifelse(is_congruent == -1, "incongruent", "congruent"),
-         prev_congruency = ifelse(prev_congruent == -1, "incongruent", "congruent"),
-         condition = paste0(congruency, "-", prev_congruency))
-
-obtained_f = obtained_f %>% 
-   mutate(congruency = ifelse(is_congruent == 0, "incongruent", "congruent"),
-         prev_congruency = ifelse(prev_congruent == 0, "incongruent", "congruent"),
-         condition = paste0(congruency, "-", prev_congruency))
-
-
-flanker_simplot = small1 %>% 
- #filter(1>=diffusion_rt) %>% 
-  ggplot(aes(x=diffusion_rt, fill = condition, position = 'identity'))+
-  geom_density(alpha=.5) +
-  xlim(0,3)+
-  ylim(0,2)
-
-flanker_simplot
-  
+filtered_model = lmer(diffusion_rt ~ prev_congruent * is_congruent + (1+is_congruent|participant_id), data=large_filtered, control = lmerControl(optimizer = "Nelder_Mead"))
+summary(filtered_model)["coefficients"]
 ```
+
 
 ```{r}
-flanker_emplot = obtained_f %>% 
-  #filter(congruency == "incongruent") %>% 
-  ggplot(aes(x=rt/1000, fill = condition, position = 'identity'))+
-  geom_density(alpha=.5)+
-  xlim(0,3)+
-  ylim(0,2)
+filtered_aggregated = large_filtered %>% 
+  group_by(participant_id, congruency, prev_congruency) %>% 
+  summarize(mean_rt = mean(diffusion_rt, na.rm=T))
 
-flanker_emplot
+ezANOVA(filtered_aggregated, dv=mean_rt, wid = participant_id, within = .(prev_congruency, congruency))
+
 ```
-
-```{r}
-large_no_datasets = large_no_effects %>% 
-  filter(model_id == "full_lmer",
-         participants == 400) %>% 
-  select(df_id,evidence_for_cse, filter_type) %>% 
-  group_by(df_id, filter_type) %>% 
-  pivot_wider(values_from = evidence_for_cse, names_from = filter_type)
-
-
-df4 = large_no_effects %>% 
-  filter(id == "400_0004")
-```
-

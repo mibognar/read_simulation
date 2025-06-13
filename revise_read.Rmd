@@ -259,8 +259,8 @@ combined_roc_plot_large %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15, .2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 ggsave("ROC_all_models.png", dpi = 600, width = 8, height = 4)
@@ -394,8 +394,8 @@ combined_roc_plot_large_nofilter %>% ggplot(aes(x = FPR, y = TPR, group = model_
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15, .2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 ggsave("ROC_nofilter_large.png", dpi = 600, width = 8, height = 4)
@@ -523,8 +523,8 @@ combined_roc_plot_large_3 %>% ggplot(aes(x = FPR, y = TPR, group = model_id, col
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15, .2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 ggsave("ROC_3SD_large.png", dpi = 600, width = 8, height = 4)
@@ -633,8 +633,8 @@ combined_roc_plot_filters %>% ggplot(aes(x = FPR, y = TPR, group = filter_type, 
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.2), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15, .2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
 ggsave("ROC_filters_large.png", dpi = 600, width = 8, height = 4)
@@ -798,11 +798,11 @@ combined_roc_plot_small %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15, .2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
-ggsave("ROC_all_small.png", dpi = 600, width = 8, height = 6)
+ggsave("ROC_all_small.png", dpi = 600, width = 8, height = 4)
 ```
 
 ## NOFILTER SMALL
@@ -925,11 +925,11 @@ combined_roc_plot_small_nofilter %>% ggplot(aes(x = FPR, y = TPR, group = model_
   labs(x = "False Positive Rate (FPR)",
        y = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_x_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_y_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15,.2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
 
-ggsave("ROC_nofilter_small.png", dpi = 600, width = 8, height = 6)
+ggsave("ROC_nofilter_small.png", dpi = 600, width = 8, height = 4)
 ```
 
 
@@ -1038,8 +1038,8 @@ combined_roc_plot_small_3SD = no_small_summary_table_models_3 %>%
 combined_roc_plot_small_3SD = combined_roc_plot_small_3SD[order(combined_roc_plot_small_3SD$model_id, combined_roc_plot_small_3SD$participants), ]
 
 
-combined_roc_plot_small_3SD %>% ggplot(aes(y = FPR, x = TPR, group = model_id, color = model_id)) +
-  geom_hline(yintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+combined_roc_plot_small_3SD %>% ggplot(aes(x = FPR, y = TPR, group = model_id, color = model_id)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
   geom_path() +
   geom_point() +
   ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
@@ -1053,10 +1053,10 @@ combined_roc_plot_small_3SD %>% ggplot(aes(y = FPR, x = TPR, group = model_id, c
   labs(y = "False Positive Rate (FPR)",
        x = "True Positive Rate (TPR)",
        color = "Model") +
-  scale_y_continuous(limits = c(0,.15),breaks = c(0, .025, .05, .1, .15))+
-  scale_x_continuous(limits = c(0,1.1), breaks = c(0, .2, .4, .6, .8, 1))+
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15,.2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
   papaja::theme_apa()
-ggsave("ROC_3_small_horizontal.png", dpi = 600, width = 8, height = 6)
+ggsave("ROC_3SD_small.png", dpi = 600, width = 8, height = 4)
 ```
 
 
@@ -1066,9 +1066,9 @@ ggsave("ROC_3_small_horizontal.png", dpi = 600, width = 8, height = 6)
 small_summary_table_filters = small_effects %>% 
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type, participants) %>% 
-  summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+ summarize(N = n(),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -1080,8 +1080,8 @@ small_summary_table_filters_results = small_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -1113,8 +1113,8 @@ no_small_summary_table_filters = small_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type, participants) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -1125,8 +1125,8 @@ no_small_summary_table_filters_results = small_no_effects %>%
   filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(filter_type) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -1150,14 +1150,54 @@ no_small_summary_plot_filters = no_small_summary_table_filters %>%
 no_small_summary_plot_filters
 ggsave(plot = no_small_summary_plot_filters, "no_small_filters.png", dpi = 600, width = 8, height = 4)
 ```
+### ROC SMALL Conditions
+```{r}
+combined_roc_plot_small_filters = no_small_summary_table_filters %>% 
+  select(FPR, filter_type, participants) %>% 
+  left_join(., small_summary_table_filters, by=c("participants", "filter_type")) %>% 
+  mutate(participants = factor(participants, levels = c(25, 50, 100, 200, 400), ordered = TRUE),
+         participant_jitter = offsets_participants[filter_type])
+
+combined_roc_plot_small_filters = combined_roc_plot_small_filters[order(combined_roc_plot_small_filters$filter_type, combined_roc_plot_small_filters$participants), ]
+
+
+combined_roc_plot_small_filters %>% ggplot(aes(x = FPR, y = TPR, group = filter_type, color = filter_type)) +
+  geom_vline(xintercept = 0.025, linetype = "dashed", color = "grey", alpha=.6)+
+  geom_path() +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = participants), size = 2.5, max.overlaps = 10, show.legend = FALSE, segment.color = NA, min.segment.length = 0.2) +
+  scale_color_manual(name = "Filter Type", 
+                       labels = c("no_filter" = "No outlier filter",
+                                  "mad_2.0" = "+-2 MAD",
+                                  "mad_2.5" = "+-2.5 MAD",
+                                  "mad_3.0" = "+-3 MAD",
+                                  "sd_2.0" = "+-2 SD",
+                                  "sd_2.5" = "+-2.5 SD",
+                                  "sd_3.0" = "+-3 SD",
+                                  "time_1" = "200 ms < RT < 1000 ms",
+                                  "time_1.25" = "200 ms < RT < 1250 ms",
+                                  "time_1.5" = "200 ms < RT < 1500 ms"
+                                  ),
+                       values=cb_palette)+
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)",
+       color = "Model") +
+  scale_x_continuous(limits = c(0,.2),breaks = c(0, .025, .05, .1, .15,.2))+
+  scale_y_continuous(limits = c(0,1), breaks = c(0, .2, .4, .6, .8, 1))+
+  papaja::theme_apa()
+
+ggsave("ROC_filters_small.png", dpi = 600, width = 8, height = 4)
+```
+
+
 ### all combinations small
 ```{r}
 small_summary_table_results = small_effects %>% 
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id,filter_type) %>% 
   summarize(N = n(),
-            TPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            TPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = TPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = TPR+1.96*(evidence_sd/sqrt(N))
             )
@@ -1169,72 +1209,10 @@ small_no_summary_table_results = small_no_effects %>%
    filter(convergence_status == "Converged" | model_id == "anova") %>% 
   group_by(model_id,filter_type) %>% 
   summarize(N = n(),
-            FPR = mean(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
-            evidence_sd = sd(ifelse(model_id == 'anova', ifelse(p.value<.05, 1, 0), ifelse(evidence,1,0)), na.rm = T),
+            FPR = mean(evidence_for_cse, na.rm = T),
+            evidence_sd = sd(evidence_for_cse, na.rm = T),
             lower_ci = FPR-1.96*(evidence_sd/sqrt(N)),
             upper_ci = FPR+1.96*(evidence_sd/sqrt(N))
             )
 small_no_summary_table_results
 ```
-
-
-```{r}
-small_roc_data = small_summary_table %>% 
-  left_join(., no_summary_table, by="model_id")
-```
-
-## NO summary read
-
-
-```{r}
-library(qs)
-sampledata1 =qread("results/0505/large_effect_sample.qs")
-sampledata2 = qread("sampled_files/sampled_files/small_effect/200_0589.qs")
-```
-
-
-```{r}
-participants = sampledata1 %>% 
-  group_by(participant_id) %>% 
-  summarize(meanrt = mean(diffusion_rt, na.rm = T),
-            sdrt = sd(diffusion_rt))
-
-sd(sampledata1$diffusion_rt)
-
-hist(sampledata1$diffusion_rt)
-
-csedata = sampledata1 %>% 
-  group_by(prev_congruent, is_congruent) %>% 
-  summarize(meanrt = mean(diffusion_rt, na.rm = T))
-
-csedata %>% ggplot() +
-  aes(x=prev_congruent, y = meanrt, group = is_congruent, color = is_congruent) +
-  geom_point()+
-  geom_path()
-```
-```{r}
-primprob = read_csv("obtained/primeprobe_processed.csv")
-
-hist(primprob$rt)
-```
-
-```{r}
-library(lme4)
-library(ez)
-mymodel = lmer(diffusion_rt ~ is_congruent + is_congruent:prev_congruent + (1 | participant_id), data = sampledata1)
-summary(mymodel)
-
-csedatasummary = sampledata1 %>% 
-  group_by(participant_id, prev_congruent, is_congruent) %>% 
-  summarize(meanrt = mean(diffusion_rt),
-            N = n())
-
-test = csedatasummary %>% group_by(participant_id) %>% summarize(condn = n())
-
-(II-IC)<(CI-CC)
-
-summary(aov(meanrt ~ as.factor(is_congruent) + as.factor(is_congruent)*as.factor(prev_congruent) + Error(1/participant_id), data = csedatasummary))
-
-myanova = ezANOVA(data = csedatasummary, dv = meanrt, wid = participant_id, within = .(is_congruent, prev_congruent))
-```
-
