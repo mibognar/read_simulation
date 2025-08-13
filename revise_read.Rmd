@@ -9,6 +9,8 @@ date: "2025-04-03"
 library(tidyverse)
 library(papaja)
 library(viridis)
+
+# Change path depending on your path to combined_results_contaminants and all_cse_results
 combined_results = read_csv("results/0505/combined_results_contaminants.csv")
 cse_descriptives = read_csv("results/0505/all_cse_results.csv")
 

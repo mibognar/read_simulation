@@ -24,6 +24,7 @@ cb_palette <- c(
   "#999933", # olive
   "#661100" # dark brown
 )
+#Change path depending on your path of downloaded datafiles
 
 large1 = qread("results/0505/400_0004.qs")
 
